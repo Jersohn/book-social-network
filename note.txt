@@ -1,6 +1,0 @@
-deploy:
-  stage: deploy
-  before_script:
-    - chmod 400 $AWS_SSH_PRIVATE_KEY
-  script:
-    - ssh -o StrictHostKeyChecking=no -i $AWS_SSH_PRIVATE_KEY ubuntu@ec2-34-233-128-75.compute-1.amazonaws.com "echo '$DOCKER_HUB_TOKEN' | docker login -u jersohn --password-stdin && docker pull jersohn/$IMAGE_NAME:$IMAGE_TAG && docker ps -aq | xargs -r docker stop | xargs -r docker rm && docker run -d --restart unless-stopped -p 5000:5000 --name my_app jersohn/$IMAGE_NAME:$IMAGE_TAG"
