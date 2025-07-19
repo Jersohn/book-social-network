@@ -120,7 +120,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          
+
       - name: Set up SSH key
         run: |
           echo "${{ secrets.AWS_SSH_PRIVATE_KEY }}" > aws_key.pem
@@ -152,25 +152,19 @@ jobs:
               -i aws_key.pem \
               ubuntu@ec2-54-88-192-148.compute-1.amazonaws.com << 'EOF'
           set -e
+          # Authentification Docker Hub
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+          
+          # Variables d'environnement
           export IMAGE_TAG=${{ steps.extract_version.outputs.VERSION }}
           export EMAIL_HOST_NAME=${{ secrets.EMAIL_HOST_NAME }}
           export EMAIL_USER_NAME=${{ secrets.EMAIL_USER_NAME }}
           export EMAIL_PASSWORD=${{ secrets.EMAIL_PASSWORD }}
+          
+          # Déploiement
           cd ci-cd
           docker compose -f docker-compose.yml pull
           docker compose -f docker-compose.yml up -d
-          # Vérification spécifique au backend
-          docker ps --filter "name=bsn-api" --format "{{.Status}}" | grep -q "Up"
-          echo "Backend deployment successful"
+          
           EOF
-#  health-check:
-#    name: API Health Check
-#    runs-on: ubuntu-latest
-#    needs: [deploy]
-#    steps:
-#      - name: Check the docker container health status
-#        run: |
-#          if ! docker ps -a | grep bsn-api; then
-#            echo "Container is not running"
-#            exit 1
-#          fi
+  

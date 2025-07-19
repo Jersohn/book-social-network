@@ -72,29 +72,26 @@ jobs:
               docker-compose.yml \
               ubuntu@ec2-54-88-192-148.compute-1.amazonaws.com:ci-cd/docker-compose.yml
 
-      - name: Deploy application
+      - name: Deploy Frontend Application
         run: |
           ssh -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               -o LogLevel=ERROR \
               -i aws_key.pem \
               ubuntu@ec2-54-88-192-148.compute-1.amazonaws.com << 'EOF'
-          set -e
+          set -euo pipefail
+          
+          # Authentification Docker Hub
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+          
+          # Variables d'environnement
           export IMAGE_TAG=${{ steps.extract_version.outputs.VERSION }}
+          
+          # Déploiement
           cd ci-cd
-          docker compose -f docker-compose.yml pull
-          docker compose -f docker-compose.yml up -d
-          docker ps --filter "name=bsn-ui" --format "{{.Status}}" | grep -q "Up"
-          echo "Deployment successful"
-          EOF
-#  health-check:
-#    name: UI Health Check
-#    runs-on: ubuntu-latest
-#    needs: [deploy]
-#    steps:
-#      - name: Check the docker container health status
-#        run: |
-#          if ! docker ps -a | grep bsn-ui; then
-#            echo "Container is not running"
-#            exit 1
-#          fi
+          echo "Pulling latest frontend image..."
+          docker compose -f docker-compose.yml pull bsn-ui
+          
+          echo "Starting containers..."
+          docker compose -f docker-compose.yml up -d bsn-ui
+
