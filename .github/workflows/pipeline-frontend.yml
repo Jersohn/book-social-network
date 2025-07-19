@@ -44,6 +44,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: [ build-image ]
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Set up SSH key
         run: |
           echo "${{ secrets.AWS_SSH_PRIVATE_KEY }}" > aws_key.pem
@@ -65,7 +70,7 @@ jobs:
               -o LogLevel=ERROR \
               -i aws_key.pem \
               docker-compose.yml \
-              ubuntu@ec2-54-88-192-148.compute-1.amazonaws.com:ci-cd/
+              ubuntu@ec2-54-88-192-148.compute-1.amazonaws.com:ci-cd/docker-compose.yml
 
       - name: Deploy application
         run: |
