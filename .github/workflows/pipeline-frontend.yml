@@ -39,26 +39,49 @@ jobs:
           platforms: linux/amd64
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/bsn-ui:latest,${{ secrets.DOCKERHUB_USERNAME }}/bsn-ui:${{ steps.extract_version.outputs.VERSION }}
 
-  # deploy:
-  #   name: Deploy Frontend
-  #   runs-on: ubuntu-latest
-  #   needs: [ build-image ]
-  #   steps:
+  deploy:
+    name: Deploy Frontend
+    runs-on: ubuntu-latest
+    needs: [ build-image ]
+    steps:
+      - name: Set up SSH key
+        run: |
+          echo "${{ secrets.AWS_SSH_PRIVATE_KEY }}" > aws_key.pem
+          chmod 400 aws_key.pem
+        
+      - name: Create deployment folder
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o LogLevel=ERROR \
+              -i aws_key.pem \
+              ubuntu@ec2-54-88-192-148.compute-1.amazonaws.com \
+              "mkdir -p ci-cd"
 
-  #     - name: Create deployment folder
-  #       run: ssh ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_IP }} "mkdir -p ci-cd"
+      - name: Copy docker-compose file
+        run: |
+          scp -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o LogLevel=ERROR \
+              -i aws_key.pem \
+              docker-compose.yml \
+              ubuntu@ec2-54-88-192-148.compute-1.amazonaws.com:ci-cd/docker-compose.yml
 
-  #     - name: Copy docker-compose file
-  #       run: scp -oStrictHostKeyChecking=no docker-compose.yml ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_IP }}:ci-cd/docker-compose.yml
-
-  #     - name: Set ENV variable and deploy
-  #       run: |
-  #         ssh ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_IP }} <<EOF
-  #         cd ci-cd
-  #         docker compose -f docker-compose.yml pull -q
-  #         docker compose -f docker-compose.yml up -d
-  #         EOF
-
+      - name: Deploy application
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o LogLevel=ERROR \
+              -i aws_key.pem \
+              ubuntu@ec2-54-88-192-148.compute-1.amazonaws.com << 'EOF'
+          set -e
+          export IMAGE_TAG=${{ steps.extract_version.outputs.VERSION }}
+          cd ci-cd
+          docker compose -f docker-compose.yml pull
+          docker compose -f docker-compose.yml up -d
+          docker ps --filter "name=bsn-ui" --format "{{.Status}}" | grep -q "Up"
+          echo "Deployment successful"
+          EOF
 #  health-check:
 #    name: UI Health Check
 #    runs-on: ubuntu-latest

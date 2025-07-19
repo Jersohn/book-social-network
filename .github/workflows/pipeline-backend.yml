@@ -85,7 +85,7 @@ jobs:
         with:
           java-version: '17'
           distribution: 'corretto'
-          
+
       - name: Extract project version
         id: extract_version
         run: |
@@ -111,28 +111,53 @@ jobs:
             APP_VERSION=${{ steps.extract_version.outputs.VERSION }}
   
 
-  # deploy:
-  #   name: Deploy Backend
-  #   runs-on: ubuntu-latest
-  #   needs: [build-image]
-  #   steps:
+  deploy:
+    name: Deploy Backend
+    runs-on: ubuntu-latest
+    needs: [build-image]
+    steps:
+      - name: Set up SSH key
+        run: |
+          echo "${{ secrets.AWS_SSH_PRIVATE_KEY }}" > aws_key.pem
+          chmod 400 aws_key.pem
+          
+      - name: Create deployment folder
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o LogLevel=ERROR \
+              -i aws_key.pem \
+              ubuntu@ec2-54-88-192-148.compute-1.amazonaws.com \
+              "mkdir -p ci-cd"
 
-  #     - name: Create deployment folder
-  #       run: ssh ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_IP }} "mkdir -p ci-cd"
+      - name: Copy docker-compose file
+        run: |
+          scp -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o LogLevel=ERROR \
+              -i aws_key.pem \
+              docker-compose.yml \
+              ubuntu@ec2-54-88-192-148.compute-1.amazonaws.com:ci-cd/docker-compose.yml
 
-  #     - name: Copy docker-compose file
-  #       run: scp -oStrictHostKeyChecking=no docker-compose.yml ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_IP }}:ci-cd/docker-compose.yml
-
-  #     - name: Set ENV variable and deploy
-  #       run: |
-  #         ssh ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_IP }} <<EOF
-  #         export EMAIL_HOST_NAME=${{ secrets.EMAIL_HOST_NAME }}
-  #         export EMAIL_USER_NAME=${{ secrets.EMAIL_USER_NAME }}
-  #         export EMAIL_PASSWORD=${{ secrets.EMAIL_PASSWORD }}
-  #         cd ci-cd
-  #         docker compose -f docker-compose.yml pull -q
-  #         docker compose -f docker-compose.yml up -d
-  #         EOF
+      - name: Deploy application with environment variables
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o LogLevel=ERROR \
+              -i aws_key.pem \
+              ubuntu@ec2-54-88-192-148.compute-1.amazonaws.com << 'EOF'
+          set -e
+          export IMAGE_TAG=${{ steps.extract_version.outputs.VERSION }}
+          export EMAIL_HOST_NAME=${{ secrets.EMAIL_HOST_NAME }}
+          export EMAIL_USER_NAME=${{ secrets.EMAIL_USER_NAME }}
+          export EMAIL_PASSWORD=${{ secrets.EMAIL_PASSWORD }}
+          cd ci-cd
+          docker compose -f docker-compose.yml pull
+          docker compose -f docker-compose.yml up -d
+          # Vérification spécifique au backend
+          docker ps --filter "name=bsn-api" --format "{{.Status}}" | grep -q "Up"
+          echo "Backend deployment successful"
+          EOF
 #  health-check:
 #    name: API Health Check
 #    runs-on: ubuntu-latest
