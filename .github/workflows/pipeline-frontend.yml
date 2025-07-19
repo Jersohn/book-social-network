@@ -65,7 +65,7 @@ jobs:
               -o LogLevel=ERROR \
               -i aws_key.pem \
               docker-compose.yml \
-              ubuntu@ec2-54-88-192-148.compute-1.amazonaws.com:ci-cd/docker-compose.yml
+              ubuntu@ec2-54-88-192-148.compute-1.amazonaws.com:ci-cd/
 
       - name: Deploy application
         run: |
